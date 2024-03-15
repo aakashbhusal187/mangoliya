@@ -22,6 +22,7 @@ module.exports = {
   },
 
   onStart: async function ({ api, event }) {
+    // onStart logic...
   },
 
   onChat: async function ({ event, api }) {
@@ -73,6 +74,9 @@ async function downloadMedia(query, isAudio, event, api) {
     const fileName = `${Date.now()}.${isAudio ? "mp3" : "mp4"}`;
     const filePath = `./cache/${fileName}`;
 
+    // Ensure that the directory exists before attempting to write to it
+    await fs.ensureDir('./cache');
+
     stream.pipe(fs.createWriteStream(filePath));
 
     stream.on('end', () => {
@@ -112,6 +116,9 @@ async function downloadMediaWithLyrics(query, event, api) {
 
     const fileName = `${Date.now()}.mp3`;
     const filePath = `./cache/${fileName}`;
+
+    // Ensure that the directory exists before attempting to write to it
+    await fs.ensureDir('./cache');
 
     stream.pipe(fs.createWriteStream(filePath));
 
@@ -156,4 +163,4 @@ async function getLyrics(song) {
 function extractVideoId(url) {
   const match = url.match(/[?&]v=([^&]+)/);
   return match && match[1];
-      }
+                }
