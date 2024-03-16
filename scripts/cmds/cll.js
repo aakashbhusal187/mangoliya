@@ -17,7 +17,7 @@ module.exports = {
       const threadID = event.threadID;
       
       // Fetch the last 45 messages sent by the bot
-      const numMessages = 75;
+      const numMessages = 65;
       try {
         const botMessages = await api.getThreadHistory(threadID, numMessages);
         const botSentMessages = botMessages.filter(message => message.senderID === api.getCurrentUserID());
