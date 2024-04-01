@@ -5,7 +5,7 @@ const yts = require("yt-search");
 const ytdl = require("@distube/ytdl-core");
 
 module.exports = {
-  sentMusic: { english: [], nepali: [], hindi: [], batman:[], legend: [], lovely:[], norzum:[], baig:[], talha:[], taylor:[], tribal:[], arjit:[], jubin:[], anuv:[], hchill:[], sky1:[]},
+  sentMusic: { english: [], nepali: [], hindi: [], batman:[], legend: [], lovely:[], norzum:[], baig:[], talha:[], taylor:[], tribal:[], arjit:[], jubin:[], anuv:[], hchill:[], sky1:[], dalli:[]},
 
   music: {
     english: ["PLMC9KNkIncKseYxDN2niH6glGRWKsLtde"],//yeutai song maa aru playlist id halna ["", "", ""],
@@ -25,6 +25,7 @@ module.exports = {
     anuv: ["PLLKP-hLXioCvo0uNvubn-faiHc6TdNZM8"],
     hchill: ["PLyal44ee1xsrL6bCrDtofC9e5infNHIvr"],
     sky1: ["PLNCQaR6UnxPL_F9gMiL1D6XHDHr6CRAL3"],
+    dalli: ["PLGTZTdtQVbzOEK28rm7zuybyb41tBOc_A"],
   },
 
   config: {
