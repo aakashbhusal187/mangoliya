@@ -6,10 +6,10 @@ const axios = require('axios');
 module.exports = {
   config: {
     name: "yt",
-    version: "1.0",
+    version: "2.0",
     role: 0,
     author: "SKY",
-    cooldowns: 5,
+    cooldowns: 25,
     shortDescription: "Download music or video from YouTube.",
     longDescription: "",
     category: "media",
@@ -21,9 +21,7 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ api, event }) {
-    // onStart logic...
-  },
+  onStart: async function ({ api, event }) {},
 
   onChat: async function ({ event, api }) {
     const message = event.body.toLowerCase().trim();
@@ -32,7 +30,7 @@ module.exports = {
       const videoId = extractVideoId(message);
       if (videoId) {
         await downloadMedia(videoId, false, event, api);
-        return; // Return early after processing the YouTube link
+        return;
       }
     }
 
@@ -52,17 +50,17 @@ module.exports = {
 };
 
 async function downloadMedia(query, isAudio, event, api) {
+  let loadingMessage;
   if (!query) {
-    return api.sendMessage(`Please specify a ${isAudio ? "music" : "video"} name.`, event.threadID);
+    return api.sendMessage(`Please specify a ${isAudio ? "music" : "video"} name.`, event.threadID, event.messageID);
   }
 
   try {
-    const loadingMessage = await api.sendMessage(`Searching ${isAudio ? "music" : "video"} for "${query}". Please wait...`, event.threadID);
+    loadingMessage = await api.sendMessage(`Searching ${isAudio ? "music" : "video"} for "${query}". Please wait...`, event.threadID);
 
     const searchResults = await yts(query);
     if (!searchResults.videos.length) {
-      api.sendMessage(`No ${isAudio ? "music" : "video"} found.`, event.threadID);
-      api.unsendMessage(loadingMessage.messageID);
+      api.sendMessage(`No ${isAudio ? "music" : "video"} found.`, event.threadID, event.messageID);
       return;
     }
 
@@ -74,38 +72,48 @@ async function downloadMedia(query, isAudio, event, api) {
     const fileName = `${Date.now()}.${isAudio ? "mp3" : "mp4"}`;
     const filePath = `./cache/${fileName}`;
 
-    // Ensure that the directory exists before attempting to write to it
     await fs.ensureDir('./cache');
 
     stream.pipe(fs.createWriteStream(filePath));
 
     stream.on('end', () => {
       api.sendMessage({
-        body: `Title: ${media.title}`,
+        body: `🎧 Title: ${media.title}\n🎤 Artist: ${media.author.name}\n⏳ Duration: ${media.timestamp}\n📅 Release Date: ${media.ago}`,
         attachment: fs.createReadStream(filePath)
-      }, event.threadID, () => {
+      }, event.threadID, event.messageID)
+      .then(() => {
         fs.unlinkSync(filePath);
-        api.unsendMessage(loadingMessage.messageID);
+      })
+      .catch(error => {
+        console.error('[ERROR]', error);
+        api.sendMessage('An error occurred while sending the media.', event.threadID, event.messageID)
+        .finally(() => {
+          fs.unlinkSync(filePath);
+        });
       });
     });
   } catch (error) {
     console.error('[ERROR]', error);
-    api.sendMessage('An error occurred while processing the command.', event.threadID);
+    api.sendMessage('An error occurred while processing the command.', event.threadID, event.messageID);
+  } finally {
+    if (loadingMessage) {
+      api.unsendMessage(loadingMessage.messageID);
+    }
   }
 }
 
 async function downloadMediaWithLyrics(query, event, api) {
+  let loadingMessage;
   if (!query) {
-    return api.sendMessage("Please specify a song title.", event.threadID);
+    return api.sendMessage("Please specify a song title.", event.threadID, event.messageID);
   }
 
   try {
-    const loadingMessage = await api.sendMessage(`Searching for "${query}". Please wait...`, event.threadID);
+    loadingMessage = await api.sendMessage(`Searching for "${query}". Please wait...`, event.threadID);
 
     const searchResults = await yts(query);
     if (!searchResults.videos.length) {
-      api.sendMessage(`No videos found for "${query}".`, event.threadID);
-      api.unsendMessage(loadingMessage.messageID);
+      api.sendMessage(`No videos found for "${query}".`, event.threadID, event.messageID);
       return;
     }
 
@@ -117,7 +125,6 @@ async function downloadMediaWithLyrics(query, event, api) {
     const fileName = `${Date.now()}.mp3`;
     const filePath = `./cache/${fileName}`;
 
-    // Ensure that the directory exists before attempting to write to it
     await fs.ensureDir('./cache');
 
     stream.pipe(fs.createWriteStream(filePath));
@@ -125,24 +132,34 @@ async function downloadMediaWithLyrics(query, event, api) {
     stream.on('end', async () => {
       const lyrics = await getLyrics(query);
       if (!lyrics) {
-        api.sendMessage(`No lyrics found for "${query}".`, event.threadID);
-        api.unsendMessage(loadingMessage.messageID);
+        api.sendMessage(`No lyrics found for "${query}".`, event.threadID, event.messageID);
         return;
       }
 
       const replyMessage = {
-        body: `Title: ${media.title}\n\nLyrics for "${query}":\n${lyrics}`,
+        body: `🎧 Title: ${media.title}\n🎤 Artist: ${media.author.name}\n⏳ Duration: ${media.timestamp}\n📅 Release Date: ${media.ago}\n\nLyrics for "${query}":\n${lyrics}`,
         attachment: fs.createReadStream(filePath),
       };
 
-      api.sendMessage(replyMessage, event.threadID, () => {
+      api.sendMessage(replyMessage, event.threadID, event.messageID)
+      .then(() => {
         fs.unlinkSync(filePath);
-        api.unsendMessage(loadingMessage.messageID);
+      })
+      .catch(error => {
+        console.error('[ERROR]', error);
+        api.sendMessage('An error occurred while sending the media.', event.threadID, event.messageID)
+        .finally(() => {
+          fs.unlinkSync(filePath);
+        });
       });
     });
   } catch (error) {
     console.error('[ERROR]', error);
-    api.sendMessage('An error occurred while processing the command.', event.threadID);
+    api.sendMessage('An error occurred while processing the command.', event.threadID, event.messageID);
+  } finally {
+    if (loadingMessage) {
+      api.unsendMessage(loadingMessage.messageID);
+    }
   }
 }
 
@@ -163,4 +180,4 @@ async function getLyrics(song) {
 function extractVideoId(url) {
   const match = url.match(/[?&]v=([^&]+)/);
   return match && match[1];
-                }
+                                    }
