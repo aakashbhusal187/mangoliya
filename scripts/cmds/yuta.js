@@ -16,7 +16,13 @@ const spotifyApi = new SpotifyWebApi({
 async function fetchRandomTrackFromPlaylist(accessToken, playlistId) {
   try {
     const tracks = await fetchPlaylistTracks(accessToken, playlistId);
-    const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+    const unplayedTracks = tracks.filter(track => !module.exports.music.playedTracks.includes(track.name));
+
+    if (unplayedTracks.length === 0) {
+      module.exports.music.playedTracks = [];
+    }
+
+    const randomTrack = unplayedTracks[Math.floor(Math.random() * unplayedTracks.length)];
     return randomTrack;
   } catch (error) {
     console.error("Error fetching random track:", error);
@@ -78,6 +84,7 @@ module.exports = {
   sentMusic: {},
   music: {
     playlist: ["52bAtqS3WksgyjQKzkBJrj"],
+    playedTracks: [],
   },
   config: {
     name: "yuta",
@@ -126,8 +133,10 @@ module.exports = {
       const audioFilePath = await downloadAudioFromYouTube(youtubeVideo.url, audioFileName);
 
       const audioStream = fs.createReadStream(audioFilePath);
-      api.sendMessage({ body: `🎧 Now playing: ${trackName} by ${artists}\n⏰ Duration: ${duration}\n📅 Release Date: ${releaseDate}`, attachment: audioStream }, event.threadID, event.messageID);
+      api.sendMessage({ body: `🎧 Title: ${trackName}\n🎤 Artist: ${artists}\n⏳ Duration: ${duration}\n📅 Release Date: ${releaseDate}`, attachment: audioStream }, event.threadID, event.messageID);
       api.unsendMessage(loadingMessage.messageID);
+
+      this.music.playedTracks.push(trackName);
     } catch (error) {
       console.error("Error:", error);
       api.sendMessage("An error occurred while processing the command.", event.threadID);
