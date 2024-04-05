@@ -29,6 +29,30 @@ module.exports = {
     const groupIdentifier = args.shift(); // Extract group ID or name from arguments
     const noticeMessage = args.join(" ");
 
+    if (groupIdentifier.toLowerCase() === 'all') {
+      // Send notice to all groups
+      const groups = await api.getThreadList(200, null, ["INBOX"]);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const group of groups) {
+        try {
+          await sendNoticeToGroup(group, noticeMessage, event, api, message);
+          successCount++;
+        } catch (error) {
+          console.error(error);
+          errorCount++;
+        }
+      }
+
+      if (errorCount === 0) {
+        message.reply(`✅ Successfully sent notice to all ${successCount} groups.`);
+      } else {
+        message.reply(`✅ Successfully sent notice to ${successCount} groups, but encountered errors while sending to ${errorCount} groups.`);
+      }
+      return;
+    }
+
     if (!groupIdentifier) {
       return message.reply(
         "Please provide both the group ID or name and the message or attachment you want to send."
@@ -77,14 +101,36 @@ module.exports = {
 
     try {
       await api.sendMessage(formSend, targetGroup.threadID);
-      message.reply(
-        `✅ Sent notice to the group "${targetGroup.name}" successfully!`
-      );
     } catch (error) {
       console.error(error);
-      message.reply(
+      return message.reply(
         `❌ Error occurred while sending notice to the group "${targetGroup.name}".`
       );
     }
+
+    message.reply(
+      `✅ Successfully sent notice to "${groupIdentifier}" group.`
+    );
   },
 };
+
+async function sendNoticeToGroup(group, noticeMessage, event, api, message) {
+  const allAttachments = [
+    ...event.attachments,
+    ...(event.messageReply?.attachments || []),
+  ];
+
+  let formSend = {};
+
+  if (allAttachments.length) {
+    // If there are attachments, use them
+    formSend.attachment = await getStreamsFromAttachment(allAttachments);
+  }
+
+  if (noticeMessage) {
+    // If there is also a text message, include it in the body
+    formSend.body = `\n\n${noticeMessage}`;
+  }
+
+  await api.sendMessage(formSend, group.threadID);
+}
