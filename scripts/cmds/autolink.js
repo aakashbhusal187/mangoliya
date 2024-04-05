@@ -4,15 +4,30 @@ const cheerio = require("cheerio");
 const qs = require("qs");
 const { getStreamFromURL, shortenURL, randomString } = global.utils;
 
+function loadAutoLinkStates() {
+  try {
+    const data = fs.readFileSync("autolink.json", "utf8");
+    return JSON.parse(data);
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveAutoLinkStates(states) {
+  fs.writeFileSync("autolink.json", JSON.stringify(states, null, 2));
+}
+
+let autoLinkStates = loadAutoLinkStates();
+
 module.exports = {
   threadStates: {},
   config: {
     name: 'autolink',
-    version: '1.1',
-    author: 'Kshitiz',
+    version: '4.0',
+    author: 'Vex_Kshitiz',
     countDown: 5,
     role: 0,
-    shortDescription: 'Auto video downloader for Instagram, Facebook, TikTok, and Twitter',
+    shortDescription: 'Auto video downloader for Instagram, Facebook, TikTok, Twitter, pinterest and youtube',
     longDescription: '',
     category: 'media',
     guide: {
@@ -22,20 +37,37 @@ module.exports = {
   onStart: async function ({ api, event }) {
     const threadID = event.threadID;
 
+    if (!autoLinkStates[threadID]) {
+      autoLinkStates[threadID] = 'on'; 
+      saveAutoLinkStates(autoLinkStates);
+    }
+
     if (!this.threadStates[threadID]) {
       this.threadStates[threadID] = {};
     }
 
-    if (event.body.toLowerCase().includes('autolink')) {
-      api.sendMessage("AutoLink is active.", event.threadID, event.messageID);
+    if (event.body.toLowerCase().includes('autolink off')) {
+      autoLinkStates[threadID] = 'off';
+      saveAutoLinkStates(autoLinkStates);
+      api.sendMessage("AutoLink is now turned off for this chat.", event.threadID, event.messageID);
+    } else if (event.body.toLowerCase().includes('autolink on')) {
+      autoLinkStates[threadID] = 'on';
+      saveAutoLinkStates(autoLinkStates);
+      api.sendMessage("AutoLink is now turned on for this chat.", event.threadID, event.messageID);
     }
   },
   onChat: async function ({ api, event }) {
+    const threadID = event.threadID;
+
     if (this.checkLink(event.body)) {
       const { url } = this.checkLink(event.body);
       console.log(`Attempting to download from URL: ${url}`);
-      this.downLoad(url, api, event);
-      api.setMessageReaction("💐", event.messageID, (err) => {}, true);
+      if (autoLinkStates[threadID] === 'on' || !autoLinkStates[threadID]) {
+        this.downLoad(url, api, event);
+      } else {
+        api.sendMessage("", event.threadID, event.messageID);
+      }
+      api.setMessageReaction("🕐", event.messageID, (err) => {}, true);
     }
   },
   downLoad: function (url, api, event) {
@@ -52,9 +84,10 @@ module.exports = {
       this.downloadTwitter(url, api, event, path);
     } else if (url.includes("pin.it")) {
       this.downloadPinterest(url, api, event, path);
+    } else if (url.includes("youtu")) {
+      this.downloadYouTube(url, api, event, path);
     }
   },
-  
   downloadInstagram: async function (url, api, event, path) {
     try {
       const res = await this.getLink(url, api, event, path);
@@ -111,32 +144,38 @@ module.exports = {
   },
   downloadTikTok: async function (url, api, event, path) {
     try {
-      const res = await this.getLink(url, api, event, path);
-      const response = await axios({
-        method: "GET",
-        url: res,
-        responseType: "arraybuffer"
-      });
-      fs.writeFileSync(path, Buffer.from(response.data, "utf-8"));
-      if (fs.statSync(path).size / 1024 / 1024 > 25) {
-        return api.sendMessage("The file is too large, cannot be sent", event.threadID, () => fs.unlinkSync(path), event.messageID);
+      const res = await axios.get(`https://tikdl-video.vercel.app/tiktok?url=${encodeURIComponent(url)}`);
+      if (res.data.videoUrl) {
+        const videoUrl = res.data.videoUrl;
+        const response = await axios({
+          method: "GET",
+          url: videoUrl,
+          responseType: "stream"
+        });
+        if (response.headers['content-length'] > 87031808) {
+          return api.sendMessage("The file is too large, cannot be sent", event.threadID, () => fs.unlinkSync(path), event.messageID);
+        }
+        response.data.pipe(fs.createWriteStream(path));
+        response.data.on('end', async () => {
+          const shortUrl = await shortenURL(videoUrl);
+          const messageBody = `✅🔗 Download Url: ${shortUrl}`;
+
+          api.sendMessage({
+            body: messageBody,
+            attachment: fs.createReadStream(path)
+          }, event.threadID, () => fs.unlinkSync(path), event.messageID);
+        });
+      } else {
+        api.sendMessage("", event.threadID, event.messageID);
       }
-
-      const shortUrl = await shortenURL(res);
-      const messageBody = `✅  Download Url: ${shortUrl}`;
-
-      api.sendMessage({
-        body: messageBody,
-        attachment: fs.createReadStream(path)
-      }, event.threadID, () => fs.unlinkSync(path), event.messageID);
     } catch (err) {
       console.error(err);
     }
   },
   downloadTwitter: async function (url, api, event, path) {
     try {
-      const res = await axios.get(`https://xdl-tjqe.onrender.com/kshitiz?url=${encodeURIComponent(url)}`);
-      const videoUrl = res.data.url;
+      const res = await axios.get(`https://xdl-twitter.vercel.app/kshitiz?url=${encodeURIComponent(url)}`);
+      const videoUrl = res.data.videoUrl;
 
       const response = await axios({
         method: "GET",
@@ -164,7 +203,7 @@ module.exports = {
   },
   downloadPinterest: async function (url, api, event, path) {
     try {
-      const res = await axios.get(`https://pindl.onrender.com/kshitiz?url=${encodeURIComponent(url)}`);
+      const res = await axios.get(`https://pindl-pinterest.vercel.app/kshitiz?url=${encodeURIComponent(url)}`);
       const videoUrl = res.data.url;
 
       const response = await axios({
@@ -191,13 +230,41 @@ module.exports = {
       console.error(err);
     }
   },
-  
+  downloadYouTube: async function (url, api, event, path) {
+    try {
+      const res = await axios.get(`https://yt-downloader-eta.vercel.app/kshitiz?url=${encodeURIComponent(url)}`);
+      const videoUrl = res.data.url;
+
+      const response = await axios({
+        method: "GET",
+        url: videoUrl,
+        responseType: "stream"
+      });
+
+      if (response.headers['content-length'] > 87031808) {
+        return api.sendMessage("The file is too large, cannot be sent", event.threadID, () => fs.unlinkSync(path), event.messageID);
+      }
+
+      response.data.pipe(fs.createWriteStream(path));
+      response.data.on('end', async () => {
+        const shortUrl = await shortenURL(videoUrl);
+        const messageBody = `✅🔗 Download Url: ${shortUrl}`;
+
+        api.sendMessage({
+          body: messageBody,
+          attachment: fs.createReadStream(path)
+        }, event.threadID, () => fs.unlinkSync(path), event.messageID);
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  },
   getLink: function (url, api, event, path) {
     return new Promise((resolve, reject) => {
       if (url.includes("instagram")) {
         axios({
           method: "GET",
-          url: `https://instadl.onrender.com/insta?url=${encodeURIComponent(url)}`
+          url: `https://insta-kshitiz.vercel.app/insta?url=${encodeURIComponent(url)}`
         })
         .then(res => {
           console.log(`API Response: ${JSON.stringify(res.data)}`);
@@ -218,9 +285,15 @@ module.exports = {
           }
         }).catch(err => reject(err));
       } else if (url.includes("tiktok")) {
-        this.queryTikTok(url).then(res => {
-          resolve(res.downloadUrls);
-        }).catch(err => reject(err));
+        axios.get(`https://tikdl-video.vercel.app/tiktok?url=${encodeURIComponent(url)}`)
+        .then(res => {
+          if (res.data.videoUrl) {
+            resolve(res.data.videoUrl);
+          } else {
+            reject(new Error("Invalid response from the TikTok API"));
+          }
+        })
+        .catch(err => reject(err));
       } else {
         reject(new Error("Unsupported platform. Only Instagram, Facebook, and TikTok are supported."));
       }
@@ -284,7 +357,8 @@ module.exports = {
         url.includes("fb.watch") ||
         url.includes("tiktok") ||
         url.includes("x.com") ||
-        url.includes("pin.it")
+        url.includes("pin.it") ||
+        url.includes("youtu")
       ) {
         return {
           url: url
@@ -362,4 +436,4 @@ async function fbDownloader(url) {
       success: false
     };
   }
-        }
+               }
