@@ -23,7 +23,7 @@ async function sing(api, event, args, message) {
    
     if (event.messageReply && event.messageReply.attachments && event.messageReply.attachments.length > 0) {
       const shortUrl = await extractShortUrl();
-      const musicRecognitionResponse = await axios.get(`https://youtube-music-sooty.vercel.app/kshitiz?url=${encodeURIComponent(shortUrl)}`);
+      const musicRecognitionResponse = await axios.get(`https://audio-reco.onrender.com/kshitiz?url=${encodeURIComponent(shortUrl)}`);
       title = musicRecognitionResponse.data.title;
     } else if (args.length === 0) {
       message.reply("Please provide a song name.");
