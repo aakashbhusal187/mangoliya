@@ -14,7 +14,7 @@
     },
     {
         "domain": ".facebook.com",
-        "expirationDate": 1746857678.179419,
+        "expirationDate": 1747297587.15504,
         "hostOnly": false,
         "httpOnly": true,
         "name": "datr",
@@ -76,18 +76,6 @@
         "session": false,
         "storeId": null,
         "value": "en_GB"
-    },
-    {
-        "domain": ".facebook.com",
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "m_pixel_ratio",
-        "path": "/",
-        "sameSite": null,
-        "secure": true,
-        "session": true,
-        "storeId": null,
-        "value": "3"
     },
     {
         "domain": ".facebook.com",
