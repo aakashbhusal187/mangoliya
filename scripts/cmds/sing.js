@@ -69,7 +69,7 @@ module.exports = {
     name: "sing",
     version: "1.0",
     author: "Kshitiz",
-    countDown: 10,
+    countDown: 20,
     role: 0,
     shortDescription: "play music from yt",
     longDescription: "play music from yt support audio recogonization.",
